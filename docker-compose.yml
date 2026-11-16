@@ -1,0 +1,99 @@
+name: nextcloud-talk
+
+x-nextcloud-env: &nextcloud-env
+  POSTGRES_HOST: db
+  POSTGRES_DB: nextcloud
+  POSTGRES_USER: nextcloud
+  POSTGRES_PASSWORD: ${DB_PASS:?defina DB_PASS}
+  REDIS_HOST: redis
+  REDIS_HOST_PASSWORD: ${REDIS_PASS:?defina REDIS_PASS}
+  NEXTCLOUD_TRUSTED_DOMAINS: ${NC_DOMAIN:?defina NC_DOMAIN}
+  TRUSTED_PROXIES: ${TRUSTED_PROXIES:-172.16.0.0/12}
+  OVERWRITEPROTOCOL: https
+  OVERWRITEHOST: ${NC_DOMAIN}
+  OVERWRITECLIURL: https://${NC_DOMAIN}
+  PHP_MEMORY_LIMIT: 1G
+  PHP_UPLOAD_LIMIT: 10G
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: nextcloud-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nextcloud
+      POSTGRES_USER: nextcloud
+      POSTGRES_PASSWORD: ${DB_PASS:?defina DB_PASS}
+    volumes:
+      - db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nextcloud -d nextcloud"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+  redis:
+    image: redis:7-alpine
+    container_name: nextcloud-redis
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASS:?defina REDIS_PASS}"]
+    networks: [internal]
+
+  app:
+    image: nextcloud:apache
+    container_name: nextcloud-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      <<: *nextcloud-env
+      NEXTCLOUD_ADMIN_USER: ${NC_ADMIN_USER:-admin}
+      NEXTCLOUD_ADMIN_PASSWORD: ${NC_ADMIN_PASS:?defina NC_ADMIN_PASS}
+    volumes:
+      - nextcloud:/var/www/html
+    networks: [internal, proxy]
+
+  cron:
+    image: nextcloud:apache
+    container_name: nextcloud-cron
+    restart: unless-stopped
+    entrypoint: /cron.sh
+    depends_on: [app]
+    environment:
+      <<: *nextcloud-env
+    volumes:
+      - nextcloud:/var/www/html
+    networks: [internal]
+
+  talk:
+    image: ghcr.io/nextcloud-releases/aio-talk:latest
+    container_name: nextcloud-talk-hpb
+    restart: unless-stopped
+    environment:
+      NC_DOMAIN: ${NC_DOMAIN}
+      TALK_PORT: 3478
+      TURN_SECRET: ${TURN_SECRET:?defina TURN_SECRET}
+      SIGNALING_SECRET: ${SIGNALING_SECRET:?defina SIGNALING_SECRET}
+      INTERNAL_SECRET: ${INTERNAL_SECRET:?defina INTERNAL_SECRET}
+    ports:
+      # TURN/STUN: vai direto do roteador para este host, NAO passa pelo NPM
+      - "3478:3478/tcp"
+      - "3478:3478/udp"
+    # Descomente se o container nao resolver o dominio publico (hairpin NAT):
+    # extra_hosts:
+    #   - "${NC_DOMAIN}:${NPM_HOST_IP}"
+    networks: [proxy]
+
+volumes:
+  db:
+  nextcloud:
+
+networks:
+  internal:
+  proxy:
+    external: true
+    name: ${NPM_NETWORK:-proxy}
