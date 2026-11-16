@@ -8,7 +8,7 @@ x-nextcloud-env: &nextcloud-env
   REDIS_HOST: redis
   REDIS_HOST_PASSWORD: ${REDIS_PASS:?defina REDIS_PASS}
   NEXTCLOUD_TRUSTED_DOMAINS: ${NC_DOMAIN:?defina NC_DOMAIN}
-  TRUSTED_PROXIES: ${TRUSTED_PROXIES:-172.16.0.0/12}
+  TRUSTED_PROXIES: ${TRUSTED_PROXIES:-172.16.0.0/12 192.168.0.0/16 10.0.0.0/8}
   OVERWRITEPROTOCOL: https
   OVERWRITEHOST: ${NC_DOMAIN}
   OVERWRITECLIURL: https://${NC_DOMAIN}
@@ -31,14 +31,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-    networks: [internal]
 
   redis:
     image: redis:7-alpine
     container_name: nextcloud-redis
     restart: unless-stopped
     command: ["redis-server", "--requirepass", "${REDIS_PASS:?defina REDIS_PASS}"]
-    networks: [internal]
 
   app:
     image: nextcloud:apache
@@ -55,7 +53,9 @@ services:
       NEXTCLOUD_ADMIN_PASSWORD: ${NC_ADMIN_PASS:?defina NC_ADMIN_PASS}
     volumes:
       - nextcloud:/var/www/html
-    networks: [internal, proxy]
+    ports:
+      # O NPM encaminha para IP_DO_SERVIDOR:APP_PORT
+      - "${APP_PORT:-8080}:80"
 
   cron:
     image: nextcloud:apache
@@ -67,7 +67,6 @@ services:
       <<: *nextcloud-env
     volumes:
       - nextcloud:/var/www/html
-    networks: [internal]
 
   talk:
     image: ghcr.io/nextcloud-releases/aio-talk:latest
@@ -80,20 +79,12 @@ services:
       SIGNALING_SECRET: ${SIGNALING_SECRET:?defina SIGNALING_SECRET}
       INTERNAL_SECRET: ${INTERNAL_SECRET:?defina INTERNAL_SECRET}
     ports:
+      # Signaling (HTTP/WebSocket): o NPM encaminha /standalone-signaling/ para IP_DO_SERVIDOR:SIGNALING_PORT
+      - "${SIGNALING_PORT:-8081}:8081"
       # TURN/STUN: vai direto do roteador para este host, NAO passa pelo NPM
       - "3478:3478/tcp"
       - "3478:3478/udp"
-    # Descomente se o container nao resolver o dominio publico (hairpin NAT):
-    # extra_hosts:
-    #   - "${NC_DOMAIN}:${NPM_HOST_IP}"
-    networks: [proxy]
 
 volumes:
   db:
   nextcloud:
-
-networks:
-  internal:
-  proxy:
-    external: true
-    name: ${NPM_NETWORK:-proxy}
