@@ -2,7 +2,7 @@
 # NAO commite o .env com valores reais.
 
 # Dominio publico do Nextcloud (o mesmo do Proxy Host no NPM)
-NC_DOMAIN=cloud.exemplo.com
+NC_DOMAIN=drive.disfrota.com.br
 
 # Nome da rede Docker onde o Nginx Proxy Manager esta (docker network ls)
 NPM_NETWORK=proxy
@@ -15,11 +15,11 @@ NPM_HOST_IP=
 
 # Admin inicial do Nextcloud
 NC_ADMIN_USER=admin
-NC_ADMIN_PASS=troque-esta-senha
+NC_ADMIN_PASS=Yg-03013821
 
 # Segredos: gere cada um com  openssl rand -hex 32
-DB_PASS=
-REDIS_PASS=
-TURN_SECRET=
-SIGNALING_SECRET=
-INTERNAL_SECRET=
+DB_PASS= 78bb4f02d600b9bc56ae87eeaf8b41224564da7e39699ac0
+REDIS_PASS= 0126fcf297c8d2da5ba198d988de53bda256df961159f7f5
+TURN_SECRET= 78bb4f02d600b9bc56ae87eeaf8b41224564da7e39699ac0
+SIGNALING_SECRET=0126fcf297c8d2da5ba198d988de53bda256df961159f7f5
+INTERNAL_SECRET=8efcdbc63dd787e3db9bbc37919cefa420d8f71c9d62eb12a2cc4ffa02cbe93b
